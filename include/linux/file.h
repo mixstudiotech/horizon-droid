@@ -113,6 +113,14 @@ int receive_fd_replace(int new_fd, struct file *file, unsigned int o_flags);
 extern void flush_delayed_fput(void);
 extern void __fput_sync(struct file *);
 
+
+#ifdef CONFIG_HORIZON
+struct files_struct;
+extern int __alloc_fd(struct files_struct *files, unsigned start, unsigned end, unsigned flags);
+extern int __close_fd(struct files_struct *files, unsigned fd);
+extern void __fd_install(struct files_struct *files, unsigned int fd, struct file *file);
+#endif
+
 extern unsigned int sysctl_nr_open_min, sysctl_nr_open_max;
 
 #endif /* __LINUX_FILE_H */

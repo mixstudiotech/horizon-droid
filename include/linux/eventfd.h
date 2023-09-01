@@ -10,6 +10,7 @@
 #define _LINUX_EVENTFD_H
 
 #include <linux/fcntl.h>
+#include <linux/kref.h>
 #include <linux/wait.h>
 #include <linux/err.h>
 #include <linux/percpu-defs.h>
@@ -30,7 +31,25 @@
 #define EFD_SHARED_FCNTL_FLAGS (O_CLOEXEC | O_NONBLOCK)
 #define EFD_FLAGS_SET (EFD_SHARED_FCNTL_FLAGS | EFD_SEMAPHORE)
 
+#ifdef CONFIG_HORIZON
+struct eventfd_ctx {
+	struct kref kref;
+	wait_queue_head_t wqh;
+	/*
+	 * Every time that a write(2) is performed on an eventfd, the
+	 * value of the __u64 being written is added to "count" and a
+	 * wakeup is performed on "wqh". A read(2) will return the "count"
+	 * value to userspace, and will reset "count" to zero. The kernel
+	 * side eventfd_signal() also, adds to the "count" counter and
+	 * issue a wakeup.
+	 */
+	__u64 count;
+	unsigned int flags;
+	int id;
+};
+#else
 struct eventfd_ctx;
+#endif
 struct file;
 
 #ifdef CONFIG_EVENTFD
@@ -97,4 +116,3 @@ static inline void eventfd_ctx_do_read(struct eventfd_ctx *ctx, __u64 *cnt)
 #endif
 
 #endif /* _LINUX_EVENTFD_H */
-

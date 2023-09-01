@@ -474,6 +474,101 @@ static unsigned int find_next_fd(struct fdtable *fdt, unsigned int start)
 	return find_next_zero_bit(fdt->open_fds, maxfd, start);
 }
 
+#ifdef CONFIG_HORIZON
+int __alloc_fd(struct files_struct *files, unsigned start, unsigned end, unsigned flags)
+{
+	unsigned int fd;
+	int error;
+	struct fdtable *fdt;
+
+	spin_lock(&files->file_lock);
+repeat:
+	fdt = files_fdtable(files);
+	fd = start;
+	if (fd < files->next_fd)
+		fd = files->next_fd;
+
+	if (fd < fdt->max_fds)
+		fd = find_next_fd(fdt, fd);
+
+	/*
+	 * N.B. For clone tasks sharing a files structure, this test
+	 * will limit the total number of files that can be opened.
+	 */
+	error = -EMFILE;
+	if (fd >= end)
+		goto out;
+
+	error = expand_files(files, fd);
+	if (error < 0)
+		goto out;
+
+	/*
+	 * If we needed to expand the fs array we
+	 * might have blocked - try again.
+	 */
+	if (error)
+		goto repeat;
+
+	if (start <= files->next_fd)
+		files->next_fd = fd + 1;
+
+	__set_open_fd(fd, fdt);
+	if (flags & O_CLOEXEC)
+		__set_close_on_exec(fd, fdt);
+	else
+		__clear_close_on_exec(fd, fdt);
+	error = fd;
+#if 1
+	/* Sanity check */
+	if (rcu_access_pointer(fdt->fd[fd]) != NULL) {
+		printk(KERN_WARNING "alloc_fd: slot %d not NULL!\n", fd);
+		rcu_assign_pointer(fdt->fd[fd], NULL);
+	}
+#endif
+
+out:
+	spin_unlock(&files->file_lock);
+	return error;
+}
+
+static struct file *pick_file(struct files_struct *files, unsigned fd);
+int __close_fd(struct files_struct *files, unsigned fd)
+{
+	struct file *file;
+	spin_lock(&files->file_lock);
+	file = pick_file(files, fd);
+	spin_unlock(&files->file_lock);
+	if (!file)
+		return -EBADF;
+
+	return filp_close(file, files);
+}
+
+void __fd_install(struct files_struct *files, unsigned int fd, struct file *file)
+{
+	struct fdtable *fdt;
+
+	rcu_read_lock_sched();
+
+	if (unlikely(files->resize_in_progress)) {
+		rcu_read_unlock_sched();
+		spin_lock(&files->file_lock);
+		fdt = files_fdtable(files);
+		BUG_ON(fdt->fd[fd] != NULL);
+		rcu_assign_pointer(fdt->fd[fd], file);
+		spin_unlock(&files->file_lock);
+		return;
+	}
+	/* coupled with smp_wmb() in expand_fdtable() */
+	smp_rmb();
+	fdt = rcu_dereference_sched(files->fdt);
+	BUG_ON(fdt->fd[fd] != NULL);
+	rcu_assign_pointer(fdt->fd[fd], file);
+	rcu_read_unlock_sched();
+}
+#endif
+
 /*
  * allocate a file descriptor, mark it busy.
  */

@@ -81,12 +81,13 @@ modules.order
 # Debian directory (make deb-pkg)
 #
 /debian/
-
+*.cmd
 #
 # Snap directory (make snap-pkg)
 #
 /snap/
-
+/.cache/
+/.vscode*
 #
 # tar directory (make tar*-pkg)
 #

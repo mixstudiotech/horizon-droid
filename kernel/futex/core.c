@@ -1065,6 +1065,16 @@ void futex_exit_recursive(struct task_struct *tsk)
 	tsk->futex_state = FUTEX_STATE_DEAD;
 }
 
+#ifdef CONFIG_HORIZON
+void horizon_futex_exit_recursive(struct task_struct *tsk)
+{
+	/* If the state is FUTEX_STATE_EXITING then futex_exit_mutex is held */
+	if (tsk->futex_state == FUTEX_STATE_EXITING)
+		mutex_unlock(&tsk->futex_exit_mutex);
+	tsk->futex_state = FUTEX_STATE_DEAD;
+}
+#endif
+
 static void futex_cleanup_begin(struct task_struct *tsk)
 {
 	/*
@@ -1123,8 +1133,24 @@ void futex_exec_release(struct task_struct *tsk)
 	futex_cleanup_end(tsk, FUTEX_STATE_OK);
 }
 
+#if defined(CONFIG_HORIZON)
+// TODO: FUTEX_WAITERS is different
+void horizon_futex_exit_release(struct task_struct *tsk)
+{
+	futex_cleanup_begin(tsk);
+	futex_cleanup(tsk);
+	futex_cleanup_end(tsk, FUTEX_STATE_DEAD);
+}
+#endif
+
 void futex_exit_release(struct task_struct *tsk)
 {
+#if defined(CONFIG_HORIZON) && !defined(HORIZON_FUTEX)
+        if (test_ti_thread_flag(task_thread_info(tsk), TIF_HORIZON)) {
+                horizon_futex_exit_release(tsk);
+		return;
+	}
+#endif
 	futex_cleanup_begin(tsk);
 	futex_cleanup(tsk);
 	futex_cleanup_end(tsk, FUTEX_STATE_DEAD);

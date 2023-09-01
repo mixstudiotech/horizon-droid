@@ -167,7 +167,12 @@ static int do_brk_munmap(struct ma_state *mas, struct vm_area_struct *vma,
 			 struct list_head *uf);
 static int do_brk_flags(struct ma_state *mas, struct vm_area_struct *brkvma,
 		unsigned long addr, unsigned long request, unsigned long flags);
+
+#ifdef CONFIG_HORIZON
+unsigned long do_brk(unsigned long brk)
+#else
 SYSCALL_DEFINE1(brk, unsigned long, brk)
+#endif
 {
 	unsigned long newbrk, oldbrk, origbrk;
 	struct mm_struct *mm = current->mm;
@@ -357,6 +362,12 @@ static void validate_mm(struct mm_struct *mm)
 #define validate_mm(mm) do { } while (0)
 #endif /* CONFIG_DEBUG_VM_MAPLE_TREE */
 
+#ifdef CONFIG_HORIZON
+SYSCALL_DEFINE1(brk, unsigned long, brk)
+{
+	return do_brk(brk);
+}
+#endif
 /*
  * vma has some anon_vma assigned, and is already inserted on that
  * anon_vma's interval trees.

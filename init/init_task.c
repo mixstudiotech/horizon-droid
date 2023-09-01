@@ -95,6 +95,15 @@ struct task_struct init_task
 		.run_list	= LIST_HEAD_INIT(init_task.rt.run_list),
 		.time_slice	= RR_TIMESLICE,
 	},
+#ifdef CONFIG_HORIZON
+	.hzn		= {
+		.list		= LIST_HEAD_INIT(init_task.hzn.list),
+		.priority	= 0,
+		.yield_type	= HZN_YIELD_NONE,
+		.rq		= NULL,
+		.state		= HZN_FIXED,
+	},
+#endif
 	.tasks		= LIST_HEAD_INIT(init_task.tasks),
 #ifdef CONFIG_SMP
 	.pushable_tasks	= PLIST_NODE_INIT(init_task.pushable_tasks, MAX_PRIO),
@@ -106,6 +115,13 @@ struct task_struct init_task
 	.ptrace_entry	= LIST_HEAD_INIT(init_task.ptrace_entry),
 	.real_parent	= &init_task,
 	.parent		= &init_task,
+#ifdef CONFIG_HORIZON
+	.hzn_cmd_addr	= 0,
+	.hzn_session_request = NULL,
+	.hzn_requests	= LIST_HEAD_INIT(init_task.hzn_requests),
+	.hzn_requests_lock = __SPIN_LOCK_UNLOCKED(init_task.hzn_requests_lock),
+	.hzn_requests_stop = false,
+#endif
 	.children	= LIST_HEAD_INIT(init_task.children),
 	.sibling	= LIST_HEAD_INIT(init_task.sibling),
 	.group_leader	= &init_task,

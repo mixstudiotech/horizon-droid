@@ -630,11 +630,21 @@ static void noinstr el0_dbg(struct pt_regs *regs, unsigned long esr)
 	exit_to_user_mode(regs);
 }
 
+#ifdef CONFIG_HORIZON
+static void noinstr el0_svc(struct pt_regs *regs, unsigned long esr)
+#else
 static void noinstr el0_svc(struct pt_regs *regs)
+#endif
 {
 	enter_from_user_mode(regs);
 	cortex_a76_erratum_1463225_svc_handler();
+
+#ifdef CONFIG_HORIZON
+	do_el0_svc(esr, regs);
+#else
 	do_el0_svc(regs);
+#endif
+
 	exit_to_user_mode(regs);
 }
 
@@ -652,7 +662,11 @@ asmlinkage void noinstr el0t_64_sync_handler(struct pt_regs *regs)
 
 	switch (ESR_ELx_EC(esr)) {
 	case ESR_ELx_EC_SVC64:
+#ifdef CONFIG_HORIZON
+		el0_svc(regs, esr);
+#else
 		el0_svc(regs);
+#endif
 		break;
 	case ESR_ELx_EC_DABT_LOW:
 		el0_da(regs, esr);
@@ -766,11 +780,21 @@ static void noinstr el0_cp15(struct pt_regs *regs, unsigned long esr)
 	exit_to_user_mode(regs);
 }
 
+#ifdef CONFIG_HORIZON
+static void noinstr el0_svc_compat(struct pt_regs *regs, unsigned long esr)
+#else
 static void noinstr el0_svc_compat(struct pt_regs *regs)
+#endif
 {
 	enter_from_user_mode(regs);
 	cortex_a76_erratum_1463225_svc_handler();
+
+#ifdef CONFIG_HORIZON
+	do_el0_svc_compat(esr, regs);
+#else
 	do_el0_svc_compat(regs);
+#endif
+
 	exit_to_user_mode(regs);
 }
 
@@ -780,7 +804,11 @@ asmlinkage void noinstr el0t_32_sync_handler(struct pt_regs *regs)
 
 	switch (ESR_ELx_EC(esr)) {
 	case ESR_ELx_EC_SVC32:
+#ifdef CONFIG_HORIZON
+		el0_svc_compat(regs, esr);
+#else
 		el0_svc_compat(regs);
+#endif
 		break;
 	case ESR_ELx_EC_DABT_LOW:
 		el0_da(regs, esr);
