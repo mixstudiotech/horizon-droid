@@ -141,6 +141,12 @@ static inline bool pwm_is_enabled(const struct pwm_device *pwm)
 	return state.enabled;
 }
 
+static inline void pwm_set_period(struct pwm_device *pwm, u64 period)
+{
+	if (pwm)
+		pwm->state.period = period;
+}
+
 static inline u64 pwm_get_period(const struct pwm_device *pwm)
 {
 	struct pwm_state state;
