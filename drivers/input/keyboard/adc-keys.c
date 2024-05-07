@@ -29,6 +29,27 @@ struct adc_keys_state {
 	const struct adc_keys_button *map;
 };
 
+struct input_dev * joypad_input_g;
+EXPORT_SYMBOL(joypad_input_g);
+
+void rk_send_key_f_key_up(void)
+{
+	if (!joypad_input_g)
+		return;
+
+	input_report_key(joypad_input_g, BTN_MODE, 1);
+	input_sync(joypad_input_g);
+}
+
+void rk_send_key_f_key_down(void)
+{
+	if (!joypad_input_g)
+		return;
+
+	input_report_key(joypad_input_g, BTN_MODE, 0);
+	input_sync(joypad_input_g);
+}
+
 static void adc_keys_poll(struct input_dev *input)
 {
 	struct adc_keys_state *st = input_get_drvdata(input);
@@ -53,11 +74,21 @@ static void adc_keys_poll(struct input_dev *input)
 	if (abs(st->keyup_voltage - value) < closest)
 		keycode = 0;
 
-	if (st->last_key && st->last_key != keycode)
-		input_report_key(input, st->last_key, 0);
+	if (st->last_key && st->last_key != keycode) {
+		if (st->last_key == 316) {
+			rk_send_key_f_key_down();
+		} else {
+			input_report_key(input, st->last_key, 0);
+		}
+	}
 
-	if (keycode)
-		input_report_key(input, keycode, 1);
+	if (keycode) {
+		if (keycode == 316) {
+			rk_send_key_f_key_up();
+		} else {
+			input_report_key(input, keycode, 1);
+		}
+	}
 
 	input_sync(input);
 	st->last_key = keycode;
