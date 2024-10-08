@@ -1548,6 +1548,11 @@ struct task_struct {
 #ifdef CONFIG_MEMCG_V1
 	struct mem_cgroup		*memcg_in_oom;
 #endif
+	/*
+	 * Whether the task wants to use compat input syscalls even if it's
+	 * a 64-bit process.
+	 */
+	bool compat_input;
 
 #ifdef CONFIG_MEMCG
 	/* Number of pages to reclaim on returning to userland: */
