@@ -180,6 +180,14 @@ static const struct id_table ic_id_table[] = {
 	  .cfg_name = "rtl_bt/rtl8723ds_config",
 	  .hw_info  = "rtl8723ds" },
 
+	/* 8733BU */
+	{ IC_INFO(RTL_ROM_LMP_8723B, 0xf, 0x8, HCI_USB),
+	  .config_needed = true,
+	  .has_rom_version = true,
+	  .fw_name  = "rtl_bt/rtl8723fu_fw",
+	  .cfg_name = "rtl_bt/rtl8723fu_config",
+	  .hw_info  = "rtl8733bu" },
+
 	/* 8821A */
 	{ IC_INFO(RTL_ROM_LMP_8821A, 0xa, 0x6, HCI_USB),
 	  .config_needed = false,
@@ -667,6 +675,7 @@ static int rtlbt_parse_firmware(struct hci_dev *hdev,
 		{ RTL_ROM_LMP_8822B, 13 },	/* 8822C */
 		{ RTL_ROM_LMP_8761A, 14 },	/* 8761B */
 		{ RTL_ROM_LMP_8852A, 18 },	/* 8852A */
+		{ RTL_ROM_LMP_8723B, 19 },	/* 8733B */
 		{ RTL_ROM_LMP_8852A, 20 },	/* 8852B */
 		{ RTL_ROM_LMP_8852A, 25 },	/* 8852C */
 		{ RTL_ROM_LMP_8851B, 36 },	/* 8851B */
@@ -1544,6 +1553,8 @@ MODULE_FIRMWARE("rtl_bt/rtl8723d_fw.bin");
 MODULE_FIRMWARE("rtl_bt/rtl8723d_config.bin");
 MODULE_FIRMWARE("rtl_bt/rtl8723ds_fw.bin");
 MODULE_FIRMWARE("rtl_bt/rtl8723ds_config.bin");
+MODULE_FIRMWARE("rtl_bt/rtl8723fu_fw.bin");
+MODULE_FIRMWARE("rtl_bt/rtl8723fu_config.bin");
 MODULE_FIRMWARE("rtl_bt/rtl8761a_fw.bin");
 MODULE_FIRMWARE("rtl_bt/rtl8761a_config.bin");
 MODULE_FIRMWARE("rtl_bt/rtl8761b_fw.bin");
