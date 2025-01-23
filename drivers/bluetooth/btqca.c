@@ -13,6 +13,78 @@
 
 #include "btqca.h"
 
+extern const char *qcom_serial_number;
+
+/* Define a static, predefined BD_ADDR structure */
+static const bdaddr_t static_bdaddr = {
+	.b = { 0x00, 0x03, 0x7F, 0x33, 0x22, 0x11 }
+};
+
+/**
+ * generate_bdaddr_from_serial - Generates a BD_ADDR using the serial number
+ * @bdaddr: Pointer to bdaddr_t structure to populate
+ *
+ * This function sets the first 3 bytes to 00:03:7F and the last 3 bytes
+ * are derived from the last 6 characters of qcom_serial_number in reversed order.
+ *
+ * Returns 0 on success, negative error code on failure.
+ */
+static int generate_bdaddr_from_serial(struct hci_dev *hdev, bdaddr_t *bdaddr)
+{
+	size_t serial_len;
+	const char *serial = qcom_serial_number;
+	char last6[7] = {0}; // 6 characters + null terminator
+	int i;
+	int ret;
+
+	if (!serial) {
+		bt_dev_err(hdev, "qcom_serial_number is NULL");
+		return -EINVAL;
+	}
+
+	serial_len = strlen(serial);
+	if (serial_len < 6) {
+		bt_dev_err(hdev, "qcom_serial_number is too short: %zu characters", serial_len);
+		return -EINVAL;
+	}
+
+	// Extract the last 6 characters (last6 is zero-initialised, stays NUL-terminated)
+	memcpy(last6, serial + serial_len - 6, 6);
+
+	// Initialize the first 3 bytes
+	bdaddr->b[5] = 0x00;
+	bdaddr->b[4] = 0x03;
+	bdaddr->b[3] = 0x7F;
+
+	// Convert the last 6 characters into 3 bytes in reversed order
+	for (i = 0; i < 3; i++) {
+		char byte_str[3] = {0};
+		u8 byte_val;
+
+		byte_str[0] = last6[i * 2];
+		byte_str[1] = last6[i * 2 + 1];
+
+		if (!isxdigit(byte_str[0]) || !isxdigit(byte_str[1])) {
+			bt_dev_err(hdev, "Invalid hex characters in serial number: %c%c",
+					   byte_str[0], byte_str[1]);
+			return -EINVAL;
+		}
+
+		ret = kstrtou8(byte_str, 16, &byte_val);
+		if (ret < 0) {
+			bt_dev_err(hdev, "Failed to convert hex string to u8: %c%c",
+					   byte_str[0], byte_str[1]);
+			return ret;
+		}
+
+		bdaddr->b[i] = byte_val; // Assign to bytes 0,1,2 (reversed order)
+	}
+
+	bt_dev_info(hdev, "Generated BD_ADDR: %pMR", bdaddr);
+
+	return 0;
+}
+
 int qca_read_soc_version(struct hci_dev *hdev, struct qca_btsoc_version *ver,
 			 enum qca_btsoc_type soc_type)
 {
@@ -699,7 +771,7 @@ int qca_set_bdaddr_rome(struct hci_dev *hdev, const bdaddr_t *bdaddr)
 }
 EXPORT_SYMBOL_GPL(qca_set_bdaddr_rome);
 
-static int qca_check_bdaddr(struct hci_dev *hdev, const struct qca_fw_config *config)
+static int __maybe_unused qca_check_bdaddr(struct hci_dev *hdev, const struct qca_fw_config *config)
 {
 	struct hci_rp_read_bd_addr *bda;
 	struct sk_buff *skb;
@@ -775,6 +847,7 @@ int qca_uart_setup(struct hci_dev *hdev, uint8_t baudrate,
 	u8 rom_ver = 0;
 	u32 soc_ver;
 	u16 boardid = 0;
+	bdaddr_t generated_bdaddr;
 
 	bt_dev_dbg(hdev, "QCA setup on UART");
 
@@ -1021,9 +1094,30 @@ int qca_uart_setup(struct hci_dev *hdev, uint8_t baudrate,
 		break;
 	}
 
-	err = qca_check_bdaddr(hdev, &config);
-	if (err)
+	/* Generate BD_ADDR from qcom_serial_number */
+	err = generate_bdaddr_from_serial(hdev, &generated_bdaddr);
+	if (err) {
+		bt_dev_err(hdev, "Failed to generate BD_ADDR from serial number");
 		return err;
+	}
+
+	/* Set the generated BD_ADDR */
+	err = qca_set_bdaddr(hdev, &generated_bdaddr);
+	if (err) {
+		bt_dev_err(hdev, "Failed to set the generated BD_ADDR from serial number");
+		return err;
+	}
+
+	/* Update hdev->public_addr and hdev->bdaddr */
+	bacpy(&hdev->public_addr, &generated_bdaddr);
+	bacpy(&hdev->bdaddr, &generated_bdaddr);
+	bt_dev_info(hdev, "BD_ADDR set to %pMR", &hdev->public_addr);
+
+
+	/* Disable reading BD_ADDR from NVM */
+	//err = qca_check_bdaddr(hdev, &config);
+	//if (err)
+	//	return err;
 
 	bt_dev_info(hdev, "QCA setup on UART is completed");
 

@@ -176,6 +176,91 @@ static const struct ieee80211_channel ath12k_6ghz_channels[] = {
 	{ .bitrate = (bps), .hw_value = (code), .hw_value_short = (code_short),\
 	  .flags = IEEE80211_RATE_SHORT_PREAMBLE }
 
+extern const char *qcom_serial_number;
+
+/* Define a small struct for storing a 6-byte MAC address array */
+struct macaddr_t {
+	u8 b[ETH_ALEN];
+};
+
+/* Define a static, predefined MAC_ADDR structure */
+static const struct macaddr_t static_macaddr = {
+	.b = { 0x00, 0x03, 0x7F, 0x11, 0x22, 0x33 }
+};
+
+/**
+ * generate_macaddr_from_serial - Generates a MAC_ADDR using the serial number
+ * @macaddr: Pointer to macaddr_t structure to populate
+ *
+ * This function sets the first 3 bytes to 00:03:7F and the last 3 bytes
+ * are derived from the last 6 characters of qcom_serial_number.
+ *
+ * Returns 0 on success, negative error code on failure.
+ */
+static int generate_macaddr_from_serial(struct ath12k *ar, struct macaddr_t *macaddr)
+{
+	size_t serial_len;
+	const char *serial = qcom_serial_number;
+	char last6[7] = {0}; // 6 characters + null terminator
+	int i;
+	int ret;
+
+	if (!serial) {
+		ath12k_err(ar->ab, "qcom_serial_number is NULL");
+		return -EINVAL;
+	}
+
+	serial_len = strlen(serial);
+	if (serial_len < 6) {
+		ath12k_err(ar->ab, "qcom_serial_number is too short: %zu characters", serial_len);
+		return -EINVAL;
+	}
+
+	// Extract the last 6 characters (last6 is zero-initialised, stays NUL-terminated)
+	memcpy(last6, serial + serial_len - 6, 6);
+
+	// Initialize the first 3 bytes
+	macaddr->b[5] = 0x00;
+	macaddr->b[4] = 0x03;
+	macaddr->b[3] = 0x7F;
+
+	// Convert the last 6 characters into 3 bytes
+	for (i = 0; i < 3; i++) {
+		char byte_str[3] = {0};
+		u8 byte_val;
+
+		byte_str[0] = last6[i * 2];
+		byte_str[1] = last6[i * 2 + 1];
+
+		if (!isxdigit(byte_str[0]) || !isxdigit(byte_str[1])) {
+			ath12k_err(ar->ab, "Invalid hex characters in serial number: %c%c",
+					   byte_str[0], byte_str[1]);
+			return -EINVAL;
+		}
+
+		ret = kstrtou8(byte_str, 16, &byte_val);
+		if (ret < 0) {
+			ath12k_err(ar->ab, "Failed to convert hex string to u8: %c%c",
+					   byte_str[0], byte_str[1]);
+			return ret;
+		}
+
+		macaddr->b[2 - i] = byte_val; // Assign to bytes 2,1,0
+	}
+
+	ath12k_info(ar->ab, "Generated MAC_ADDR: %pMR", macaddr);
+
+	return 0;
+}
+
+static void ath12k_reverse_mac(u8 *dst, const u8 *src)
+{
+	int i;
+
+	for (i = 0; i < ETH_ALEN; i++)
+		dst[i] = src[ETH_ALEN - 1 - i];
+}
+
 static struct ieee80211_rate ath12k_legacy_rates[] = {
 	{ .bitrate = 10,
 	  .hw_value = ATH12K_HW_RATE_CCK_LP_1M },
@@ -14779,6 +14864,7 @@ static int ath12k_mac_hw_register(struct ath12k_hw *ah)
 	struct ath12k_base *ab = ar->ab;
 	struct ath12k_pdev *pdev;
 	struct ath12k_pdev_cap *cap;
+	struct macaddr_t generated_macaddr;
 	static const u32 cipher_suites[] = {
 		WLAN_CIPHER_SUITE_TKIP,
 		WLAN_CIPHER_SUITE_CCMP,
@@ -14802,11 +14888,17 @@ static int ath12k_mac_hw_register(struct ath12k_hw *ah)
 		u32 ht_cap_info = 0;
 
 		pdev = ar->pdev;
-		if (ar->ab->pdevs_macaddr_valid) {
-			ether_addr_copy(ar->mac_addr, pdev->mac_addr);
+		ret = generate_macaddr_from_serial(ar, &generated_macaddr);
+		if (ret) {
+			if (ar->ab->pdevs_macaddr_valid) {
+				ether_addr_copy(ar->mac_addr, pdev->mac_addr);
+			} else {
+				ether_addr_copy(ar->mac_addr, ar->ab->mac_addr);
+				ar->mac_addr[4] += ar->pdev_idx;
+			}
 		} else {
-			ether_addr_copy(ar->mac_addr, ar->ab->mac_addr);
-			ar->mac_addr[4] += ar->pdev_idx;
+			ath12k_reverse_mac(ar->mac_addr, generated_macaddr.b);
+			ath12k_info(ab, "MAC_ADDR set to %pMR", generated_macaddr.b);
 		}
 
 		ret = ath12k_mac_setup_register(ar, &ht_cap_info, hw->wiphy->bands);

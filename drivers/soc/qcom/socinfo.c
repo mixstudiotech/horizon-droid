@@ -237,6 +237,10 @@ struct smem_image_version {
 };
 #endif /* CONFIG_DEBUG_FS */
 
+/* Global variable to hold the serial number */
+const char *qcom_serial_number;
+EXPORT_SYMBOL(qcom_serial_number);
+
 struct qcom_socinfo {
 	struct soc_device *soc_dev;
 	struct soc_device_attribute attr;
@@ -926,6 +930,9 @@ static int qcom_socinfo_probe(struct platform_device *pdev)
 							le32_to_cpu(info->serial_num));
 		if (!qs->attr.serial_number)
 			return -ENOMEM;
+
+		/* Assign the serial number to the global variable */
+		qcom_serial_number = qs->attr.serial_number;
 	}
 
 	qs->soc_dev = soc_device_register(&qs->attr);
@@ -949,6 +956,9 @@ static void qcom_socinfo_remove(struct platform_device *pdev)
 	soc_device_unregister(qs->soc_dev);
 
 	socinfo_debugfs_exit(qs);
+
+	/* Clear the global serial number */
+	qcom_serial_number = NULL;
 }
 
 static struct platform_driver qcom_socinfo_driver = {
