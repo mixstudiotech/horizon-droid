@@ -295,6 +295,14 @@ static int aw99706_hw_init(struct aw99706_device *aw)
 		}
 	}
 
+	/* [konkr] Match the stock vendor config: CFG7 = 0x05 (mainline leaves it
+	 * at POR 0x04). Read live off the working Android AW99706 — it is the only
+	 * config register the stock driver sets that this driver doesn't, and with
+	 * it at POR the panel backlight stays dark. */
+	ret = aw99706_i2c_write(aw, AW99706_CFG7_REG, 0x05);
+	if (ret < 0)
+		return ret;
+
 	return 0;
 }
 
