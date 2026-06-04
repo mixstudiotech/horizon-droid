@@ -389,17 +389,21 @@ static int aw99706_probe(struct i2c_client *client)
 		return dev_err_probe(dev, PTR_ERR(aw->regmap),
 				     "Failed to init regmap\n");
 
+	/* Enable the chip (HWEN) BEFORE reading its ID: the AW99706 is powered
+	 * down at boot, so an early I2C read NAKs ("Unknown chip id 0xfffffffa").
+	 * Get the enable GPIO asserted and give the chip a moment to come up. */
+	aw->hwen_gpio = devm_gpiod_get(aw->dev, "enable", GPIOD_OUT_HIGH);
+	if (IS_ERR(aw->hwen_gpio))
+		return dev_err_probe(dev, PTR_ERR(aw->hwen_gpio),
+				     "Failed to get enable gpio\n");
+	usleep_range(1000, 2000);
+
 	ret = aw99706_chip_id_read(aw);
 	if (ret != AW99706_ID)
 		return dev_err_probe(dev, -ENODEV,
 				     "Unknown chip id 0x%02x\n", ret);
 
 	aw99706_dt_parse(aw, &props);
-
-	aw->hwen_gpio = devm_gpiod_get(aw->dev, "enable", GPIOD_OUT_LOW);
-	if (IS_ERR(aw->hwen_gpio))
-		return dev_err_probe(dev, PTR_ERR(aw->hwen_gpio),
-				     "Failed to get enable gpio\n");
 
 	ret = aw99706_hw_init(aw);
 	if (ret < 0)
