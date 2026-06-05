@@ -426,4 +426,15 @@ config JOYSTICK_SEESAW
 	  To compile this driver as a module, choose M here: the module will be
 	  called adafruit-seesaw.
 
+config JOYSTICK_MCU
+	tristate "AYANEO SPI MCU gamepad"
+	depends on SPI
+	help
+	  Driver for the AYANEO MCU-based gamepad on Qualcomm SM8750
+	  handhelds (KONKR Pocket FIT Elite etc.), attached over SPI with a
+	  16-bit register protocol. Provides the analog sticks, D-pad and
+	  buttons.
+
+	  To compile as a module choose M: the module is called mcu_joystick.
+
 endif
