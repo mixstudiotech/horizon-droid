@@ -127,6 +127,8 @@ struct msm_dsi_host {
 	struct clk *pixel_src_clk;
 	struct clk *dsi_pll_byte_clk;
 	struct clk *dsi_pll_pixel_clk;
+	struct clk *byte_src_parent;
+	struct clk *pixel_src_parent;
 
 	unsigned long byte_clk_rate;
 	unsigned long byte_intf_clk_rate;
@@ -415,6 +417,11 @@ int dsi_link_clk_set_rate_6g_v2_9(struct msm_dsi_host *msm_host)
 {
 	struct device *dev = &msm_host->pdev->dev;
 	int ret;
+
+	if (!msm_host->byte_src_parent)
+		msm_host->byte_src_parent = clk_get_parent(msm_host->byte_src_clk);
+	if (!msm_host->pixel_src_parent)
+		msm_host->pixel_src_parent = clk_get_parent(msm_host->pixel_src_clk);
 
 	/*
 	 * DSI PHY PLLs have to be enabled to allow reparenting to them, so
@@ -2555,6 +2562,11 @@ int msm_dsi_host_power_off(struct mipi_dsi_host *host)
 	dsi_ctrl_disable(msm_host);
 
 	pinctrl_pm_select_sleep_state(&msm_host->pdev->dev);
+
+	if (msm_host->byte_src_parent)
+		clk_set_parent(msm_host->byte_src_clk, msm_host->byte_src_parent);
+	if (msm_host->pixel_src_parent)
+		clk_set_parent(msm_host->pixel_src_clk, msm_host->pixel_src_parent);
 
 	cfg_hnd->ops->link_clk_disable(msm_host);
 	pm_runtime_put(&msm_host->pdev->dev);
