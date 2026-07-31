@@ -5009,6 +5009,18 @@ skip_serdes_start:
 		goto err_disable_pipe_clk;
 	}
 
+	/*
+	 * Move the GCC pipe clk mux off the XO reference and onto the PHY pipe
+	 * clock. Since 7.2 clk_regmap_phy_mux_ops switches on set_rate instead
+	 * of on enable, so enabling the pipe clock above is no longer enough.
+	 * Do it here rather than at the enable, because the PHY only starts
+	 * driving the pipe clock once SERDES_START has completed - switching
+	 * the mux onto a source that is not yet running stalls the bus.
+	 */
+	ret = clk_set_rate(qmp->pipe_clks[0].clk, ULONG_MAX);
+	if (ret)
+		dev_warn(qmp->dev, "failed to switch pipe clk to PHY source: %d\n", ret);
+
 	return 0;
 
 err_disable_pipe_clk:
