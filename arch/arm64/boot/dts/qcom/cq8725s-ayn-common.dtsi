@@ -41,6 +41,7 @@
 		qcom,mbhc-headphone-vthreshold-microvolt = <50000>;
 		qcom,rx-device = <&wcd_rx>;
 		qcom,tx-device = <&wcd_tx>;
+		qcom,usbss = <&wcd_usbss>;
 
 		reset-gpios = <&tlmm 101 GPIO_ACTIVE_LOW>;
 
