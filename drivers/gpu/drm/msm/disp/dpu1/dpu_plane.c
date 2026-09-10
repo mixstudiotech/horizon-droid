@@ -487,6 +487,27 @@ static void _dpu_plane_setup_scaler3(struct dpu_hw_sspp *pipe_hw,
 	scale_cfg->lut_flag = 0;
 	scale_cfg->blend_cfg = 1;
 	scale_cfg->enable = 1;
+	if (src_w != dst_w || src_h != dst_h) {
+		scale_cfg->dir_en = 1;
+		scale_cfg->dir_weight = 32;
+
+		scale_cfg->de.enable = 1;
+		scale_cfg->de.sharpen_level1 = 8;
+		scale_cfg->de.sharpen_level2 = 8;
+		scale_cfg->de.clip = 0;
+		scale_cfg->de.limit = 4;
+		scale_cfg->de.thr_quiet = 8;
+		scale_cfg->de.thr_dieout = 256;
+		scale_cfg->de.thr_low = 8;
+		scale_cfg->de.thr_high = 64;
+		scale_cfg->de.prec_shift = 2;
+		scale_cfg->de.blend = 0;
+		for (i = 0; i < DPU_MAX_DE_CURVES; i++) {
+			scale_cfg->de.adjust_a[i] = 112;
+			scale_cfg->de.adjust_b[i] = 0;
+			scale_cfg->de.adjust_c[i] = 0;
+		}
+	}
 }
 
 static void _dpu_plane_setup_pixel_ext(struct dpu_hw_scaler3_cfg *scale_cfg,

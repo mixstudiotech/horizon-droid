@@ -81,6 +81,7 @@ struct dpu_hw_scaler3_de_cfg {
 	int16_t adjust_a[DPU_MAX_DE_CURVES];
 	int16_t adjust_b[DPU_MAX_DE_CURVES];
 	int16_t adjust_c[DPU_MAX_DE_CURVES];
+	uint32_t blend;
 };
 
 

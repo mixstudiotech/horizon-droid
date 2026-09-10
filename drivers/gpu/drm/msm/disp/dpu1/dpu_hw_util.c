@@ -67,6 +67,8 @@ static u32 dpu_hw_util_log_mask = DPU_DBG_MASK_NONE;
 #define QSEED3LITE_COEF_LUT_CTRL              0x4C
 #define QSEED3LITE_COEF_LUT_SWAP_BIT          0
 #define QSEED3LITE_DIR_FILTER_WEIGHT          0x60
+#define QSEED3_DE_LPF_BLEND                0x64
+#define QSEED5_DEFAULT_DE_LPF_BLEND        0x3FF00000
 #define QSEED3LITE_FILTERS                 2
 #define QSEED3LITE_SEPARABLE_LUTS             10
 #define QSEED3LITE_LUT_SIZE                   33
@@ -256,7 +258,8 @@ static void _dpu_hw_setup_scaler3_de(struct dpu_hw_blk_reg_map *c,
 
 	sharp_ctl = ((de_cfg->limit & 0xF) << 9) |
 		((de_cfg->prec_shift & 0x7) << 13) |
-		((de_cfg->clip & 0x7) << 16);
+		((de_cfg->clip & 0x7) << 16) |
+		((de_cfg->blend & 0xF) << 20);
 
 	shape_ctl = (de_cfg->thr_quiet & 0xFF) |
 		((de_cfg->thr_dieout & 0x3FF) << 16);
@@ -326,7 +329,14 @@ void dpu_hw_setup_scaler3(struct dpu_hw_blk_reg_map *c,
 	if (scaler3_cfg->de.enable) {
 		_dpu_hw_setup_scaler3_de(c, &scaler3_cfg->de, scaler_offset);
 		op_mode |= BIT(8);
+		if (scaler_version >= 0x3000)
+			DPU_REG_WRITE(c, QSEED3_DE_LPF_BLEND + scaler_offset,
+				      QSEED5_DEFAULT_DE_LPF_BLEND);
 	}
+
+	if (scaler_version >= 0x2004)
+		DPU_REG_WRITE(c, QSEED3LITE_DIR_FILTER_WEIGHT + scaler_offset,
+			      scaler3_cfg->dir_weight & 0xFF);
 
 	if (scaler3_cfg->lut_flag) {
 		if (scaler_version < 0x2004)
