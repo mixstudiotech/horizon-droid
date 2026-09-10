@@ -59,6 +59,9 @@
 #define VIG_SC7280_MASK_SDMA \
 	(VIG_SC7280_MASK | BIT(DPU_SSPP_SMART_DMA_V2))
 
+#define VIG_SM8750_MASK_SDMA \
+	(VIG_SDM845_MASK_SDMA | BIT(DPU_SSPP_INLINE_ROTATION))
+
 #define DMA_SDM845_MASK_NO_SDMA \
 	(BIT(DPU_SSPP_QOS) | \
 	BIT(DPU_SSPP_TS_PREFILL) | BIT(DPU_SSPP_TS_PREFILL_REC1) |\
@@ -190,6 +193,23 @@ static const u32 rotation_v2_formats[] = {
 	/* TODO add formats after validation */
 };
 
+static const u32 rotation_v201_formats[] = {
+	DRM_FORMAT_NV12,
+	DRM_FORMAT_P010,
+	DRM_FORMAT_ARGB8888,
+	DRM_FORMAT_ABGR8888,
+	DRM_FORMAT_RGBA8888,
+	DRM_FORMAT_BGRA8888,
+	DRM_FORMAT_XRGB8888,
+	DRM_FORMAT_XBGR8888,
+	DRM_FORMAT_RGBX8888,
+	DRM_FORMAT_BGRX8888,
+	DRM_FORMAT_ARGB2101010,
+	DRM_FORMAT_ABGR2101010,
+	DRM_FORMAT_XRGB2101010,
+	DRM_FORMAT_XBGR2101010,
+};
+
 static const u32 wb2_formats_rgb_yuv[] = {
 	DRM_FORMAT_RGB565,
 	DRM_FORMAT_BGR565,
@@ -309,6 +329,12 @@ static const struct dpu_rotation_cfg dpu_rot_sc7280_cfg_v2 = {
 	.rot_format_list = rotation_v2_formats,
 };
 
+static const struct dpu_rotation_cfg dpu_rot_sm8750_cfg_v201 = {
+	.rot_maxheight = 1088,
+	.rot_num_formats = ARRAY_SIZE(rotation_v201_formats),
+	.rot_format_list = rotation_v201_formats,
+};
+
 static const struct dpu_sspp_sub_blks dpu_vig_sblk_qseed2 =
 				_VIG_SBLK_QSEED2();
 
@@ -345,6 +371,10 @@ static const struct dpu_sspp_sub_blks dpu_vig_sblk_qseed3_3_3 =
 
 static const struct dpu_sspp_sub_blks dpu_vig_sblk_qseed3_3_4 =
 				_VIG_SBLK(SSPP_SCALER_VER(3, 4));
+
+static const struct dpu_sspp_sub_blks dpu_vig_sblk_qseed3_3_4_rot_v2 =
+			_VIG_SBLK_ROT(SSPP_SCALER_VER(3, 4),
+				      &dpu_rot_sm8750_cfg_v201);
 
 static const struct dpu_sspp_sub_blks dpu_vig_sblk_qseed3_3_5 =
 				_VIG_SBLK_REC0_REC1(SSPP_SCALER_VER(3, 5));
