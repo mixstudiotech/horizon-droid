@@ -993,4 +993,17 @@ config INPUT_STPMIC1_ONKEY
 	  To compile this driver as a module, choose M here: the
 	  module will be called stpmic1_onkey.
 
+config INPUT_KONKR_SYSBTN
+	tristate "KONKR Pocket FIT Elite MCU system buttons"
+	depends on SERIAL_DEV_BUS
+	depends on LEDS_CLASS_MULTICOLOR
+	help
+	  Driver for the MCU-attached "system" buttons (KONKR, Home,
+	  Shoulder-2 pair, front-top-right) on the KONKR Pocket FIT Elite
+	  handheld, delivered over a UART, and for the analog-stick RGB
+	  lighting on the same link (exposed as a multicolor LED).
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called konkr_sysbtn.
+
 endif
