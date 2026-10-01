@@ -637,6 +637,17 @@ static int pmic_glink_altmode_probe(struct auxiliary_device *adev,
 					     "failed to acquire mode-switch for port: %d\n",
 					     port);
 		}
+		/*
+		 * A NULL mux means the connector's mode-switch supplier (e.g. the
+		 * wcd_usbss SBU switch on I2C) has not registered yet — defer and
+		 * retry rather than run permanently without SBU/DP-AUX routing.
+		 */
+		if (!alt_port->typec_mux) {
+			fwnode_handle_put(fwnode);
+			return dev_err_probe(dev, -EPROBE_DEFER,
+					     "mode-switch not registered yet for port: %d\n",
+					     port);
+		}
 
 		ret = devm_add_action_or_reset(dev, pmic_glink_altmode_put_mux,
 					       alt_port->typec_mux);
@@ -665,6 +676,12 @@ static int pmic_glink_altmode_probe(struct auxiliary_device *adev,
 			fwnode_handle_put(fwnode);
 			return dev_err_probe(dev, PTR_ERR(alt_port->typec_switch),
 					     "failed to acquire orientation-switch for port: %d\n",
+					     port);
+		}
+		if (!alt_port->typec_switch) {
+			fwnode_handle_put(fwnode);
+			return dev_err_probe(dev, -EPROBE_DEFER,
+					     "orientation-switch not registered yet for port: %d\n",
 					     port);
 		}
 
