@@ -817,7 +817,7 @@ static struct dpu_hw_sspp *dpu_rm_try_sspp(struct dpu_rm *rm,
 		if (reqs->yuv && !hw_sspp->cap->sblk->csc_blk.len)
 			continue;
 
-		if (reqs->rot90 && !(hw_sspp->cap->features & DPU_SSPP_INLINE_ROTATION))
+		if (reqs->rot90 && !test_bit(DPU_SSPP_INLINE_ROTATION, &hw_sspp->cap->features))
 			continue;
 
 		global_state->sspp_to_crtc_id[i] = crtc_id;
