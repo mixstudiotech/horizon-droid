@@ -556,7 +556,7 @@ static void mbhc_plug_detect_fn(struct work_struct *work)
 		mbhc->extn_cable_hph_rem = false;
 
 		if (mbhc->current_plug == MBHC_PLUG_TYPE_NONE)
-			goto exit;
+			goto report_removed;
 
 		mbhc->is_btn_press = false;
 		switch (mbhc->current_plug) {
@@ -573,17 +573,34 @@ static void mbhc_plug_detect_fn(struct work_struct *work)
 			break;
 		case MBHC_PLUG_TYPE_GND_MIC_SWAP:
 			dev_err(mbhc->dev, "Ground and Mic Swapped on plug\n");
-			goto exit;
+			goto report_removed;
 		default:
 			dev_err(mbhc->dev, "Invalid current plug: %d\n",
 				mbhc->current_plug);
-			goto exit;
+			goto report_removed;
 		}
 		disable_irq_nosync(mbhc->intr_ids->mbhc_hs_rem_intr);
 		disable_irq_nosync(mbhc->intr_ids->mbhc_hs_ins_intr);
 		wcd_mbhc_write_field(mbhc, WCD_MBHC_ELECT_DETECTION_TYPE, 1);
 		wcd_mbhc_write_field(mbhc, WCD_MBHC_ELECT_SCHMT_ISRC, 0);
 		wcd_mbhc_report_plug(mbhc, 0, jack_type);
+		goto exit;
+
+ report_removed:
+		/*
+		 * Mechanical detection is the physical ground truth that the
+		 * jack is out. On boards with an integrated jack wired behind an
+		 * analog switch (e.g. WCD939x USBSS) the ADC plug-type path can
+		 * desync and leave current_plug == NONE (or a gnd/mic-swap
+		 * error) while hph_status still holds the headphone bit -- which
+		 * freezes the "Headphone Jack" control at "inserted", so
+		 * userspace keeps the speaker muted forever. Force a clean
+		 * removal report so the speaker route comes back.
+		 */
+		if (mbhc->hph_status) {
+			mbhc->hph_status = 0;
+			snd_soc_jack_report(mbhc->jack, 0, WCD_MBHC_JACK_MASK);
+		}
 	}
 
 exit:
