@@ -3391,10 +3391,24 @@ static int wcd939x_codec_set_jack(struct snd_soc_component *comp,
 {
 	struct wcd939x_priv *wcd = dev_get_drvdata(comp->dev);
 
-	if (jack)
+	if (jack) {
+		/*
+		 * MBHC can only report while the SoundWire devices stay
+		 * resumed: suspending them lets the link stop its clock, and
+		 * the codec's interrupt then has nowhere to go - detection
+		 * goes completely silent even though MBHC itself is armed and
+		 * powered. Hold them up for as long as a jack is registered.
+		 */
+		pm_runtime_forbid(wcd->rxdev);
+		pm_runtime_forbid(wcd->txdev);
+
 		return wcd_mbhc_start(wcd->wcd_mbhc, &wcd->mbhc_cfg, jack);
+	}
 
 	wcd_mbhc_stop(wcd->wcd_mbhc);
+
+	pm_runtime_allow(wcd->txdev);
+	pm_runtime_allow(wcd->rxdev);
 
 	return 0;
 }
