@@ -565,7 +565,7 @@ static int pwm_fan_probe(struct platform_device *pdev)
 	 * Set duty cycle to maximum allowed and enable PWM output as well as
 	 * the regulator. In case of error nothing is changed
 	 */
-	ret = set_pwm(ctx, initial_pwm);
+	ret = set_pwm(ctx, 70);
 	if (ret) {
 		dev_err(dev, "Failed to configure PWM: %d\n", ret);
 		return ret;
