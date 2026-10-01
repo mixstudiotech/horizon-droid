@@ -17,6 +17,7 @@
 #include <sound/tlv.h>
 #include <linux/of_graph.h>
 #include <linux/of.h>
+#include <linux/i2c.h>
 #include <sound/jack.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
@@ -187,6 +188,8 @@ struct wcd939x_priv {
 	unsigned long typec_mode;
 	struct typec_switch *typec_switch;
 #endif /* CONFIG_TYPEC */
+	/* external analog switch (WCD939x USBSS) for an integrated jack */
+	struct device *usbss_dev;
 	/* mbhc module */
 	struct wcd_mbhc *wcd_mbhc;
 	struct wcd_mbhc_config mbhc_cfg;
@@ -2411,8 +2414,27 @@ static void wcd939x_mbhc_moisture_polling_ctrl(struct snd_soc_component *compone
 				      enable);
 }
 
+/* Provided by the WCD939x USBSS analog-switch driver (built-in). */
+int wcd939x_usbss_audio_config(struct device *dev, bool enable);
+
+/*
+ * Route the WCD939x USBSS into/out of audio-accessory mode when the MBHC
+ * detects an integrated 3.5mm jack via the mechanical path.  Without it the
+ * jack's HPHL/HPHR lines float through the switch and MBHC reports a gnd/mic
+ * swap.  No-op on boards without a USBSS (usbss_dev == NULL).
+ */
+static void wcd939x_mbhc_ext_switch_ctrl(struct snd_soc_component *component,
+					 bool enable)
+{
+	struct wcd939x_priv *wcd939x = snd_soc_component_get_drvdata(component);
+
+	if (wcd939x->usbss_dev)
+		wcd939x_usbss_audio_config(wcd939x->usbss_dev, enable);
+}
+
 static const struct wcd_mbhc_cb mbhc_cb = {
 	.clk_setup = wcd939x_mbhc_clk_setup,
+	.mbhc_ext_switch_ctrl = wcd939x_mbhc_ext_switch_ctrl,
 	.mbhc_bias = wcd939x_mbhc_mbhc_bias_control,
 	.set_btn_thr = wcd939x_mbhc_program_btn_thr,
 	.micbias_enable_status = wcd939x_mbhc_micb_en_status,
@@ -3218,6 +3240,23 @@ static int wcd939x_populate_dt_data(struct wcd939x_priv *wcd939x, struct device 
 		cfg->swap_gnd_mic = wcd939x_swap_gnd_mic;
 	}
 #endif /* CONFIG_TYPEC */
+
+	/*
+	 * If an external analog switch (WCD939x USBSS) carries the HP lines to
+	 * an integrated jack, grab its device so MBHC can route it on insert.
+	 */
+	{
+		struct device_node *usbss_np;
+		struct i2c_client *usbss_client;
+
+		usbss_np = of_parse_phandle(dev->of_node, "qcom,usbss", 0);
+		if (usbss_np) {
+			usbss_client = of_find_i2c_device_by_node(usbss_np);
+			of_node_put(usbss_np);
+			if (usbss_client)
+				wcd939x->usbss_dev = &usbss_client->dev;
+		}
+	}
 
 	return 0;
 }

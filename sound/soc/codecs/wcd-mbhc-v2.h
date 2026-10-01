@@ -265,6 +265,13 @@ struct wcd_mbhc_cb {
 	bool (*mbhc_get_moisture_status)(struct snd_soc_component *component);
 	void (*mbhc_moisture_polling_ctrl)(struct snd_soc_component *component, bool enable);
 	void (*mbhc_moisture_detect_en)(struct snd_soc_component *component, bool enable);
+	/*
+	 * Route an external analog switch (e.g. WCD939x USBSS) into/out of
+	 * audio-accessory mode when an integrated jack is detected via the
+	 * mechanical path.  Optional; only set on boards whose HP lines are
+	 * wired through such a switch.
+	 */
+	void (*mbhc_ext_switch_ctrl)(struct snd_soc_component *component, bool enable);
 };
 
 #if IS_ENABLED(CONFIG_SND_SOC_WCD_MBHC)

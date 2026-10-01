@@ -752,6 +752,36 @@ static void wcd939x_usbss_remove(struct i2c_client *client)
 	typec_mux_put(usbss->codec);
 }
 
+/*
+ * wcd939x_usbss_audio_config - drive the analog switch into (or out of)
+ * audio-accessory routing on behalf of the WCD codec's MBHC.
+ *
+ * On boards with an *integrated* 3.5mm jack wired through this switch, the jack
+ * is detected by the codec's MBHC mechanical path and produces no Type-C
+ * connector event, so the normal connector -> mux_set(AUDIO) routing never
+ * runs.  Until the switch is in audio mode the codec's HPHL/HPHR sense lines
+ * float and MBHC mis-classifies the plug as a ground/mic swap.  The codec calls
+ * this on insert/removal so the same routing the connector would have applied
+ * is in place before MBHC measures the plug.  @dev is this USBSS i2c device.
+ */
+int wcd939x_usbss_audio_config(struct device *dev, bool enable)
+{
+	struct wcd939x_usbss *usbss = dev ? dev_get_drvdata(dev) : NULL;
+	int ret;
+
+	if (!usbss)
+		return -ENODEV;
+
+	mutex_lock(&usbss->lock);
+	usbss->mode = enable ? TYPEC_MODE_AUDIO : TYPEC_STATE_SAFE;
+	usbss->svid = 0;
+	ret = wcd939x_usbss_set(usbss);
+	mutex_unlock(&usbss->lock);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(wcd939x_usbss_audio_config);
+
 static const struct i2c_device_id wcd939x_usbss_table[] = {
 	{ .name = "wcd9390-usbss" },
 	{ }

@@ -535,11 +535,21 @@ static void mbhc_plug_detect_fn(struct work_struct *work)
 	if (detection_type) {
 		if (mbhc->current_plug != MBHC_PLUG_TYPE_NONE)
 			goto exit;
+		/*
+		 * Route the external analog switch (if any) into audio mode so
+		 * an integrated jack presents a real HPHL/HPHR load to plug
+		 * detection instead of floating (which reads as a gnd/mic swap).
+		 */
+		if (mbhc->mbhc_cb->mbhc_ext_switch_ctrl)
+			mbhc->mbhc_cb->mbhc_ext_switch_ctrl(component, true);
 		/* Make sure MASTER_BIAS_CTL is enabled */
 		mbhc->mbhc_cb->mbhc_bias(component, true);
 		mbhc->is_btn_press = false;
 		wcd_mbhc_adc_detect_plug_type(mbhc);
 	} else {
+		/* Jack removed: take the external analog switch out of audio. */
+		if (mbhc->mbhc_cb->mbhc_ext_switch_ctrl)
+			mbhc->mbhc_cb->mbhc_ext_switch_ctrl(component, false);
 		/* Disable HW FSM */
 		wcd_mbhc_write_field(mbhc, WCD_MBHC_FSM_EN, 0);
 		wcd_mbhc_write_field(mbhc, WCD_MBHC_BTN_ISRC_CTL, 0);
