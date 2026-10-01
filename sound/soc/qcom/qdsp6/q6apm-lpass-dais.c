@@ -224,6 +224,20 @@ static int q6apm_lpass_dai_prepare(struct snd_pcm_substream *substream, struct s
 		dev_err(dai->dev, "Failed to prepare Graph %d\n", rc);
 		goto err;
 	}
+
+	/*
+	 * aw88166 checks its PLL against BCLK at DAPM PRE_PMU, before the
+	 * PCM trigger; start the port here so BCLK is up in time. The
+	 * trigger's !is_port_started guard then no-ops. Playback only.
+	 */
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		rc = q6apm_graph_start(dai_data->graph[dai->id]);
+		if (rc < 0) {
+			dev_err(dai->dev, "Failed to start APM port %d\n", dai->id);
+			goto err;
+		}
+		dai_data->is_port_started[dai->id] = true;
+	}
 	return 0;
 err:
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
