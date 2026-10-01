@@ -111,6 +111,7 @@
 #define SWRM_DPn_PORT_HCTRL_BANK(offset,  n, m)	(offset + 0x100 * (n - 1) + 0x40 * m)
 #define SWRM_DPn_BLOCK_CTRL3_BANK(offset, n, m)	(offset + 0x100 * (n - 1) + 0x40 * m)
 #define SWRM_DPn_SAMPLECTRL2_BANK(offset, n, m)	(offset + 0x100 * (n - 1) + 0x40 * m)
+#define SWRM_DOUT_DP_PCM_PORT_CTRL(n)		(0x1054 + 0x100 * n)
 
 #define SWR_V1_3_MSTR_MAX_REG_ADDR				0x1740
 #define SWR_V2_0_MSTR_MAX_REG_ADDR				0x50ac
@@ -209,6 +210,7 @@ struct qcom_swrm_ctrl {
 	int nports;
 	int cols_index;
 	int rows_index;
+	u32 pcm_ports_mask;
 	unsigned long port_mask;
 	u32 intr_mask;
 	u8 rcmd_id;
@@ -1026,6 +1028,18 @@ static int qcom_swrm_port_params(struct sdw_bus *bus,
 				p_params->bps - 1);
 }
 
+/*
+ * Ports carrying PCM samples (e.g. the WCD939x HIFI_PCM headphone port)
+ * additionally need the controller's per-port PCM format enable
+ * (SWRM_DOUT_DP_PCM_PORT_CTRL) set; PDM ports don't care. Mainline has no
+ * binding for per-port stream type yet, so take the port set from an
+ * optional DT mask, overridable via module parameter for kernels whose DTB
+ * predates the property.
+ */
+static uint pcm_ports_mask;
+module_param(pcm_ports_mask, uint, 0644);
+MODULE_PARM_DESC(pcm_ports_mask, "Bitmask of data ports carrying PCM (overrides qcom,pcm-ports-mask)");
+
 static int qcom_swrm_transport_params(struct sdw_bus *bus,
 				      struct sdw_transport_params *params,
 				      enum sdw_reg_bank bank)
@@ -1120,6 +1134,18 @@ static int qcom_swrm_port_enable(struct sdw_bus *bus,
 		val |= (enable_ch->ch_mask << SWRM_DP_PORT_CTRL_EN_CHAN_SHFT);
 	else
 		val &= ~(0xff << SWRM_DP_PORT_CTRL_EN_CHAN_SHFT);
+
+	/*
+	 * Only set, never clear: port_enable also fires for the inactive
+	 * bank's disable during bank switches and would strip the PCM format
+	 * mid-stream. The register only affects PCM-mode ports, so a sticky
+	 * 0x3 is harmless.
+	 */
+	if (((ctrl->pcm_ports_mask | pcm_ports_mask) & BIT(enable_ch->port_num)) &&
+	    enable_ch->enable)
+		ctrl->reg_write(ctrl,
+				SWRM_DOUT_DP_PCM_PORT_CTRL(enable_ch->port_num),
+				0x3);
 
 	return ctrl->reg_write(ctrl, reg, val);
 }
@@ -1433,6 +1459,8 @@ static int qcom_swrm_get_port_config(struct qcom_swrm_ctrl *ctrl)
 
 		ctrl->num_din_ports = val;
 	}
+
+	of_property_read_u32(np, "qcom,pcm-ports-mask", &ctrl->pcm_ports_mask);
 
 	ret = of_property_read_u32(np, "qcom,dout-ports", &val);
 	if (!ret) { /* only if present */
