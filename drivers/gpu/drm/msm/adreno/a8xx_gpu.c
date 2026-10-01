@@ -904,6 +904,22 @@ void a8xx_recover(struct msm_gpu *gpu)
 	 */
 	gpu->active_submits = 0;
 
+	/*
+	 * A8xx (SM8750/Adreno 830): the GX GDSC lives in the separate gxclkctl
+	 * domain and feeds the shader cores + the CX GDSC power dependency. On a
+	 * GMU hang the firmware leaves GX voted on in HW (RPMH), so CX cannot
+	 * collapse while GX is up: recovery deadlocks ("cx gdsc didn't
+	 * collapse") and the next hw_init times out on GMU OOB GPU_SET, which
+	 * userspace sees as VkDeviceLost. Force GX collapse BEFORE CX, mirroring
+	 * a6xx_gmu_gxpd_put() (unconditional: gx_is_on() reads false while the
+	 * GMU is hung).
+	 */
+	if (!IS_ERR_OR_NULL(gmu->gxpd)) {
+		pm_runtime_get_sync(gmu->gxpd);
+		dev_pm_genpd_synced_poweroff(gmu->gxpd);
+		pm_runtime_put_sync(gmu->gxpd);
+	}
+
 	reinit_completion(&gmu->pd_gate);
 	dev_pm_genpd_add_notifier(gmu->cxpd, &gmu->pd_nb);
 	dev_pm_genpd_synced_poweroff(gmu->cxpd);
