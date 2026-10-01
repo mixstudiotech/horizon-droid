@@ -863,6 +863,18 @@ static int aw_dev_parse_data_by_sec_type_v1(struct aw_device *aw_dev,
 		prof_info->prof_desc[*cur_scene_id].id = cfg_dde->dev_profile;
 		(*cur_scene_id)++;
 		break;
+	case ACF_SEC_TYPE_MONITOR:
+		/*
+		 * Monitor configuration is not implemented for V1 ACF
+		 * headers, but vendor-tool-generated ACF files routinely
+		 * carry a monitor section per device. The scene-count pass
+		 * (aw_get_dev_scene_count_v1() /
+		 * aw_get_default_scene_count_v1()) already excludes monitor
+		 * sections, so skip them here too instead of failing the
+		 * whole parse.
+		 */
+		dev_dbg(aw_dev->dev, "skip monitor section");
+		break;
 	default:
 		dev_err(aw_dev->dev, "unsupported SEC_TYPE [%d]", cfg_dde->data_type);
 		return -EINVAL;
