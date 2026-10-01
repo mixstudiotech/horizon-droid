@@ -736,7 +736,7 @@ static void __init do_populate_rootfs(void *unused, async_cookie_t cookie)
 #ifdef CONFIG_BLK_DEV_RAM
 		populate_initrd_image(err);
 #else
-		printk(KERN_EMERG "Initramfs unpacking failed: %s\n", err);
+		printk(KERN_DEBUG "Initramfs unpacking failed: %s\n", err);
 #endif
 	}
 
