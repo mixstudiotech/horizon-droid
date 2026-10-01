@@ -657,6 +657,8 @@ struct rx_macro {
 	u16 bit_width[RX_MACRO_MAX_DAIS];
 	int is_softclip_on;
 	int is_aux_hpf_on;
+	int is_pcm_enabled;
+	int pcm_select_users;
 	int softclip_clk_users;
 	struct lpass_macro *pds;
 	struct regmap *regmap;
@@ -2644,6 +2646,28 @@ static int rx_macro_aux_hpf_mode_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static int rx_macro_hph_pcm_enable_get(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
+	struct rx_macro *rx = snd_soc_component_get_drvdata(component);
+
+	ucontrol->value.integer.value[0] = rx->is_pcm_enabled;
+
+	return 0;
+}
+
+static int rx_macro_hph_pcm_enable_put(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
+	struct rx_macro *rx = snd_soc_component_get_drvdata(component);
+
+	rx->is_pcm_enabled = ucontrol->value.integer.value[0];
+
+	return 0;
+}
+
 static int rx_macro_hphdelay_lutbypass(struct snd_soc_component *component,
 					struct rx_macro *rx,
 					u16 interp_idx, int event)
@@ -2715,16 +2739,30 @@ static int rx_macro_enable_interp_clk(struct snd_soc_component *component,
 						      CDC_RX_RXn_DSM_CLK_EN_MASK, 0x1);
 			snd_soc_component_update_bits(component, rx_cfg2_reg,
 					CDC_RX_RXn_HPF_CUT_FREQ_MASK, 0x03);
-			rx_macro_load_compander_coeff(component, rx, interp_idx, event);
-			if (rx->hph_hd2_mode)
-				rx_macro_hd2_control(component, interp_idx, event);
-			rx_macro_hphdelay_lutbypass(component, rx, interp_idx, event);
-			rx_macro_config_compander(component, rx, interp_idx, event);
+			/*
+			 * In HPH PCM mode the WCD codec owns interpolation,
+			 * DC droop and compander; skip the PDM-mode signal
+			 * conditioning here.
+			 */
+			if (!rx->is_pcm_enabled) {
+				rx_macro_load_compander_coeff(component, rx, interp_idx, event);
+				if (rx->hph_hd2_mode)
+					rx_macro_hd2_control(component, interp_idx, event);
+				rx_macro_hphdelay_lutbypass(component, rx, interp_idx, event);
+				rx_macro_config_compander(component, rx, interp_idx, event);
+			}
 			if (interp_idx == INTERP_AUX) {
 				rx_macro_config_softclip(component, rx,	event);
 				rx_macro_config_aux_hpf(component, rx, event);
 			}
 			rx_macro_config_classh(component, rx, interp_idx, event);
+			/* select PCM path over SoundWire (swr clk 9.6 MHz) */
+			if (rx->is_pcm_enabled && interp_idx != INTERP_AUX) {
+				if (rx->pcm_select_users++ == 0)
+					snd_soc_component_update_bits(component,
+							CDC_RX_TOP_SWR_CTRL,
+							BIT(1), BIT(1));
+			}
 		}
 		rx->main_clk_users[interp_idx]++;
 	}
@@ -2736,6 +2774,14 @@ static int rx_macro_enable_interp_clk(struct snd_soc_component *component,
 			/* Main path PGA mute enable */
 			snd_soc_component_write_field(component, main_reg,
 						      CDC_RX_PATH_PGA_MUTE_MASK, 0x1);
+			/* unselect PCM path over SoundWire */
+			if (rx->is_pcm_enabled && interp_idx != INTERP_AUX) {
+				if (rx->pcm_select_users > 0 &&
+				    --rx->pcm_select_users == 0)
+					snd_soc_component_update_bits(component,
+							CDC_RX_TOP_SWR_CTRL,
+							BIT(1), 0);
+			}
 			/* Clk Disable */
 			snd_soc_component_write_field(component, dsm_reg,
 						      CDC_RX_RXn_DSM_CLK_EN_MASK, 0);
@@ -2753,14 +2799,18 @@ static int rx_macro_enable_interp_clk(struct snd_soc_component *component,
 			snd_soc_component_update_bits(component, rx_cfg2_reg,
 						      CDC_RX_RXn_HPF_CUT_FREQ_MASK, 0x00);
 			rx_macro_config_classh(component, rx, interp_idx, event);
-			rx_macro_config_compander(component, rx, interp_idx, event);
+			if (!rx->is_pcm_enabled) {
+				rx_macro_config_compander(component, rx, interp_idx, event);
+			}
 			if (interp_idx ==  INTERP_AUX) {
 				rx_macro_config_softclip(component, rx,	event);
 				rx_macro_config_aux_hpf(component, rx, event);
 			}
-			rx_macro_hphdelay_lutbypass(component, rx, interp_idx, event);
-			if (rx->hph_hd2_mode)
-				rx_macro_hd2_control(component, interp_idx, event);
+			if (!rx->is_pcm_enabled) {
+				rx_macro_hphdelay_lutbypass(component, rx, interp_idx, event);
+				if (rx->hph_hd2_mode)
+					rx_macro_hd2_control(component, interp_idx, event);
+			}
 		}
 	}
 
@@ -3023,6 +3073,9 @@ static const struct snd_kcontrol_new rx_macro_snd_controls[] = {
 
 	SOC_SINGLE_EXT("RX_HPH HD2 Mode Switch", SND_SOC_NOPM, 0, 1, 0,
 		rx_macro_get_hph_hd2_mode, rx_macro_put_hph_hd2_mode),
+
+	SOC_SINGLE_EXT("RX_HPH PCM Switch", SND_SOC_NOPM, 0, 1, 0,
+		rx_macro_hph_pcm_enable_get, rx_macro_hph_pcm_enable_put),
 
 	SOC_ENUM_EXT("RX_HPH PWR Mode", rx_macro_hph_pwr_mode_enum,
 		rx_macro_get_hph_pwr_mode, rx_macro_put_hph_pwr_mode),
