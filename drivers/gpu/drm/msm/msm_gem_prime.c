@@ -5,6 +5,7 @@
  */
 
 #include <linux/dma-buf.h>
+#include <linux/dma-resv.h>
 
 #include <drm/drm_drv.h>
 #include <drm/drm_prime.h>
@@ -46,6 +47,9 @@ void msm_gem_prime_vunmap(struct drm_gem_object *obj, struct iosys_map *map)
 static void msm_gem_dmabuf_release(struct dma_buf *dma_buf)
 {
 	struct drm_gem_object *obj = dma_buf->priv;
+
+	dma_resv_wait_timeout(obj->resv, DMA_RESV_USAGE_BOOKKEEP, false,
+			      MAX_SCHEDULE_TIMEOUT);
 
 	msm_gem_vma_put(obj);
 	drm_gem_dmabuf_release(dma_buf);
