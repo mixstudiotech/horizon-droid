@@ -15,6 +15,9 @@
 #include <asm/thread_info.h>
 #include <asm/unistd.h>
 #include <asm/unistd_compat_32.h>
+#ifdef CONFIG_HORIZON
+#include <asm/horizon/syscall.h>
+#endif
 
 long compat_arm_syscall(struct pt_regs *regs, int scno);
 long sys_ni_syscall(void);
@@ -135,10 +138,24 @@ trace_exit:
 	syscall_trace_exit(regs);
 }
 
+#ifdef CONFIG_HORIZON
+void do_el0_svc(unsigned long esr, struct pt_regs *regs)
+{
+	unsigned int imm = esr & ESR_ELx_xVC_IMM_MASK;
+
+	/* For Horizon threads "svc #N" is SVC N, but "svc #0" stays Linux. */
+	if (imm && test_thread_flag(TIF_HORIZON)) {
+		el0_svc_common(regs, imm, __HNR_syscalls, horizon_sys_call_table);
+		return;
+	}
+	el0_svc_common(regs, regs->regs[8], __NR_syscalls, sys_call_table);
+}
+#else
 void do_el0_svc(struct pt_regs *regs)
 {
 	el0_svc_common(regs, regs->regs[8], __NR_syscalls, sys_call_table);
 }
+#endif
 
 #ifdef CONFIG_COMPAT
 void do_el0_svc_compat(struct pt_regs *regs)

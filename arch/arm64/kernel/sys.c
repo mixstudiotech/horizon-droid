@@ -50,9 +50,19 @@ asmlinkage long __arm64_sys_ni_syscall(const struct pt_regs *__unused)
 
 #define __SYSCALL_WITH_COMPAT(nr, native, compat)  __SYSCALL(nr, native)
 
+#ifdef CONFIG_HORIZON
+#define __HORIZON_SYSCALLS					\
+	__SYSCALL(__NR_horizon_execve, sys_horizon_execve)	\
+	__SYSCALL(__NR_horizon_execveat, sys_horizon_execveat)	\
+	__SYSCALL(__NR_horizon_servctl, sys_horizon_servctl)
+#else
+#define __HORIZON_SYSCALLS
+#endif
+
 #undef __SYSCALL
 #define __SYSCALL(nr, sym)	asmlinkage long __arm64_##sym(const struct pt_regs *);
 #include <asm/syscall_table_64.h>
+__HORIZON_SYSCALLS
 
 #undef __SYSCALL
 #define __SYSCALL(nr, sym)	[nr] = __arm64_##sym,
@@ -60,4 +70,5 @@ asmlinkage long __arm64_sys_ni_syscall(const struct pt_regs *__unused)
 const syscall_fn_t sys_call_table[__NR_syscalls] = {
 	[0 ... __NR_syscalls - 1] = __arm64_sys_ni_syscall,
 #include <asm/syscall_table_64.h>
+__HORIZON_SYSCALLS
 };

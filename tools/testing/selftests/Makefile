@@ -49,6 +49,7 @@ TARGETS += ftrace
 TARGETS += futex
 TARGETS += gpio
 TARGETS += hid
+TARGETS += horizon
 TARGETS += intel_pstate
 TARGETS += iommu
 TARGETS += ipc

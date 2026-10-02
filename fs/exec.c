@@ -69,6 +69,7 @@
 #include <linux/user_events.h>
 #include <linux/rseq.h>
 #include <linux/ksm.h>
+#include <linux/horizon.h>
 
 #include <linux/uaccess.h>
 #include <asm/mmu_context.h>
@@ -2026,4 +2027,53 @@ fs_initcall(init_fs_exec_sysctls);
 
 #ifdef CONFIG_EXEC_KUNIT_TEST
 #include "tests/exec_kunit.c"
+#endif
+
+#ifdef CONFIG_HORIZON
+/*
+ * execve() and execveat() for Horizon programs, which no other exec loads
+ * (kernel/horizon/exec.c). The process name becomes argv[0], as the Horizon
+ * Linux loader expects.
+ */
+static int do_horizon_execveat(int fd, struct filename *name,
+			       const char __user *const __user *argv,
+			       const char __user *const __user *envp,
+			       int flags)
+{
+	char comm[TASK_COMM_LEN] = "";
+	const char __user *arg0;
+	int ret;
+
+	arg0 = get_user_arg_ptr(native_arg(argv), 0);
+	if (!IS_ERR_OR_NULL(arg0) &&
+	    strncpy_from_user(comm, arg0, sizeof(comm) - 1) < 0)
+		comm[0] = 0;
+
+	current->hzn_in_execve = 1;
+	ret = do_execveat_common(fd, name, native_arg(argv), native_arg(envp),
+				 flags);
+	current->hzn_in_execve = 0;
+	if (!ret && comm[0])
+		__set_task_comm(current, comm, true);
+	return ret;
+}
+
+SYSCALL_DEFINE3(horizon_execve,
+		const char __user *, filename,
+		const char __user *const __user *, argv,
+		const char __user *const __user *, envp)
+{
+	CLASS(filename, name)(filename);
+	return do_horizon_execveat(AT_FDCWD, name, argv, envp, 0);
+}
+
+SYSCALL_DEFINE5(horizon_execveat,
+		int, fd, const char __user *, filename,
+		const char __user *const __user *, argv,
+		const char __user *const __user *, envp,
+		int, flags)
+{
+	CLASS(filename_uflags, name)(filename, flags);
+	return do_horizon_execveat(fd, name, argv, envp, flags);
+}
 #endif

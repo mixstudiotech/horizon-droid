@@ -32,6 +32,7 @@ struct file;
 #ifdef CONFIG_EVENTFD
 
 void eventfd_ctx_put(struct eventfd_ctx *ctx);
+struct file *eventfd_file_create(unsigned int count, int flags);
 struct file *eventfd_fget(int fd);
 struct eventfd_ctx *eventfd_ctx_fdget(int fd);
 struct eventfd_ctx *eventfd_ctx_fileget(struct file *file);
@@ -53,6 +54,11 @@ static inline bool eventfd_signal_allowed(void)
  */
 
 static inline struct eventfd_ctx *eventfd_ctx_fdget(int fd)
+{
+	return ERR_PTR(-ENOSYS);
+}
+
+static inline struct file *eventfd_file_create(unsigned int count, int flags)
 {
 	return ERR_PTR(-ENOSYS);
 }

@@ -376,6 +376,45 @@ struct eventfd_ctx *eventfd_ctx_fileget(struct file *file)
 }
 EXPORT_SYMBOL_GPL(eventfd_ctx_fileget);
 
+/**
+ * eventfd_file_create - Create an eventfd that is in no file table yet
+ * @count: Initial counter value
+ * @flags: EFD_* flags
+ *
+ * For in-kernel users that install the file themselves, such as the events
+ * of the Horizon personality.
+ *
+ * Returns the file, or an ERR_PTR() on failure.
+ */
+struct file *eventfd_file_create(unsigned int count, int flags)
+{
+	struct eventfd_ctx *ctx __free(kfree) = NULL;
+	struct file *file;
+
+	if (flags & ~EFD_FLAGS_SET)
+		return ERR_PTR(-EINVAL);
+
+	ctx = kmalloc_obj(*ctx);
+	if (!ctx)
+		return ERR_PTR(-ENOMEM);
+
+	kref_init(&ctx->kref);
+	init_waitqueue_head(&ctx->wqh);
+	ctx->count = count;
+	ctx->flags = flags;
+
+	flags &= EFD_SHARED_FCNTL_FLAGS;
+	flags |= O_RDWR;
+	file = anon_inode_getfile_fmode("[eventfd]", &eventfd_fops, ctx, flags,
+					FMODE_NOWAIT);
+	if (IS_ERR(file))
+		return file;
+
+	ctx->id = ida_alloc(&eventfd_ida, GFP_KERNEL);
+	retain_and_null_ptr(ctx);
+	return file;
+}
+
 static int do_eventfd(unsigned int count, int flags)
 {
 	struct eventfd_ctx *ctx __free(kfree) = NULL;

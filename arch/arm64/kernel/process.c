@@ -34,6 +34,7 @@
 #include <linux/utsname.h>
 #include <linux/uaccess.h>
 #include <linux/random.h>
+#include <linux/horizon.h>
 #include <linux/hw_breakpoint.h>
 #include <linux/personality.h>
 #include <linux/notifier.h>
@@ -256,7 +257,7 @@ static void tls_thread_flush(void)
 	if (system_supports_tpidr2())
 		write_sysreg_s(0, SYS_TPIDR2_EL0);
 
-	if (is_compat_task()) {
+	if (is_compat_task() || test_ti_horizon(current_thread_info())) {
 		current->thread.uw.tp_value = 0;
 
 		/*
@@ -531,7 +532,8 @@ static void tls_thread_switch(struct task_struct *next)
 {
 	tls_preserve_current_state();
 
-	if (is_compat_thread(task_thread_info(next)))
+	if (is_compat_thread(task_thread_info(next)) ||
+	    test_ti_horizon(task_thread_info(next)))
 		write_sysreg(next->thread.uw.tp_value, tpidrro_el0);
 	else
 		write_sysreg(0, tpidrro_el0);
@@ -636,15 +638,30 @@ static void update_cntkctl_el1(struct task_struct *next)
 		sysreg_clear_set(cntkctl_el1, ARCH_TIMER_USR_VCT_ACCESS_EN, 0);
 	else
 		sysreg_clear_set(cntkctl_el1, 0, ARCH_TIMER_USR_VCT_ACCESS_EN);
+
+	/* Horizon programs read the physical counter, CNTPCT_EL0. */
+	if (test_ti_horizon(ti) && !test_ti_thread_flag(ti, TIF_TSC_SIGSEGV))
+		sysreg_clear_set(cntkctl_el1, 0, ARCH_TIMER_USR_PCT_ACCESS_EN);
+	else if (IS_ENABLED(CONFIG_HORIZON))
+		sysreg_clear_set(cntkctl_el1, ARCH_TIMER_USR_PCT_ACCESS_EN, 0);
 }
+
+#ifdef CONFIG_HORIZON
+void horizon_update_cntkctl(void)
+{
+	preempt_disable();
+	update_cntkctl_el1(current);
+	preempt_enable();
+}
+#endif
 
 static void cntkctl_thread_switch(struct task_struct *prev,
 				  struct task_struct *next)
 {
 	if ((read_ti_thread_flags(task_thread_info(prev)) &
-	     (_TIF_32BIT | _TIF_TSC_SIGSEGV)) !=
+	     (_TIF_32BIT | _TIF_TSC_SIGSEGV | _TIF_HORIZON)) !=
 	    (read_ti_thread_flags(task_thread_info(next)) &
-	     (_TIF_32BIT | _TIF_TSC_SIGSEGV)))
+	     (_TIF_32BIT | _TIF_TSC_SIGSEGV | _TIF_HORIZON)))
 		update_cntkctl_el1(next);
 }
 
@@ -845,6 +862,8 @@ int compat_elf_check_arch(const struct elf32_hdr *hdr)
 void arch_setup_new_exec(void)
 {
 	unsigned long mmflags = 0;
+
+	horizon_exec_reset(current);
 
 	if (is_compat_task()) {
 		mmflags = MMCF_AARCH32;

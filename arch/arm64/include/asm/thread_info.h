@@ -89,6 +89,15 @@ void arch_setup_new_exec(void);
 #define TIF_TSC_SIGSEGV		30	/* SIGSEGV on counter-timer access */
 #define TIF_LAZY_MMU_PENDING	31	/* Ops pending for lazy mmu mode exit */
 
+#ifdef CONFIG_HORIZON
+#define TIF_HORIZON		16	/* Horizon (Nintendo Switch) program */
+#define _TIF_HORIZON		(1 << TIF_HORIZON)
+#define test_ti_horizon(ti)	test_ti_thread_flag(ti, TIF_HORIZON)
+#else
+#define _TIF_HORIZON		0
+#define test_ti_horizon(ti)	false
+#endif
+
 #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
 #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
 #define _TIF_NEED_RESCHED_LAZY	(1 << TIF_NEED_RESCHED_LAZY)

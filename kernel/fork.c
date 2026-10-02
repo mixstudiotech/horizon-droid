@@ -111,6 +111,7 @@
 #include <linux/tick.h>
 #include <linux/unwind_deferred.h>
 #include <linux/pgalloc.h>
+#include <linux/horizon.h>
 #include <linux/uaccess.h>
 
 #include <asm/mmu_context.h>
@@ -785,6 +786,7 @@ void __put_task_struct(struct task_struct *tsk)
 	WARN_ON(tsk == current);
 
 	unwind_task_free(tsk);
+	horizon_free_task(tsk);
 	io_uring_free(tsk);
 	cgroup_task_free(tsk);
 	task_numa_free(tsk, true);
@@ -2174,6 +2176,7 @@ __latent_entropy struct task_struct *copy_process(
 	delayacct_tsk_init(p);	/* Must remain after dup_task_struct() */
 	p->flags &= ~(PF_SUPERPRIV | PF_WQ_WORKER | PF_IDLE | PF_NO_SETAFFINITY);
 	p->flags |= PF_FORKNOEXEC;
+	horizon_fork(p);
 	INIT_LIST_HEAD(&p->children);
 	INIT_LIST_HEAD(&p->sibling);
 	rcu_copy_process(p);

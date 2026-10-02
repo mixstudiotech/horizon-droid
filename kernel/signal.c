@@ -34,6 +34,7 @@
 #include <linux/signalfd.h>
 #include <linux/ratelimit.h>
 #include <linux/task_work.h>
+#include <linux/horizon.h>
 #include <linux/capability.h>
 #include <linux/freezer.h>
 #include <linux/pid_namespace.h>
@@ -2814,7 +2815,7 @@ bool get_signal(struct ksignal *ksig)
 	int signr;
 
 	clear_notify_signal();
-	if (unlikely(task_work_pending(current)))
+	if (unlikely(task_work_pending(current)) && !horizon_defer_task_work())
 		task_work_run();
 
 	if (!task_sigpending(current))
