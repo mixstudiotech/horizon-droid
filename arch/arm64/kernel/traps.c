@@ -18,6 +18,7 @@
 #include <linux/module.h>
 #include <linux/kexec.h>
 #include <linux/delay.h>
+#include <linux/horizon.h>
 #include <linux/efi.h>
 #include <linux/init.h>
 #include <linux/sched/signal.h>
@@ -261,6 +262,9 @@ static void arm64_show_signal(int signo, const char *str)
 void arm64_force_sig_fault(int signo, int code, unsigned long far,
 			   const char *str)
 {
+	/* A Horizon program handles its own faults (svcReturnFromException). */
+	if (horizon_user_exception(signo, code, far))
+		return;
 	arm64_show_signal(signo, str);
 	if (signo == SIGKILL)
 		force_sig(SIGKILL);

@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: GPL-2.0
+
+config HORIZON
+	bool "Run Nintendo Switch (Horizon) programs natively"
+	depends on ARM64 && MMU && SHMEM
+	select RT_MUTEXES
+	help
+	  A Horizon system call personality for the services and loader of
+	  Horizon Linux (mizu): threads of a program started with
+	  horizon_execve(2) have their "svc #N" instructions (N != 0) handled
+	  as Horizon SVCs, while "svc #0" stays a Linux system call. Services
+	  are ordinary Linux processes that use horizon_servctl(2).
+
+	  Horizon threads are scheduled as SCHED_FIFO (priorities 1 to 49)
+	  when the process may use real-time priorities: with CAP_SYS_NICE,
+	  or up to its RLIMIT_RTPRIO. Otherwise they are SCHED_NORMAL.
+
+	  If unsure, say N.

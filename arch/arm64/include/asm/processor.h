@@ -281,11 +281,13 @@ static inline void arch_thread_struct_whitelist(unsigned long *offset,
 	*size = sizeof_field(struct thread_struct, uw);
 }
 
-#ifdef CONFIG_COMPAT
+#if defined(CONFIG_COMPAT) || defined(CONFIG_HORIZON)
+/* 32-bit and Horizon threads also have a TLS pointer in TPIDRRO_EL0. */
 #define task_user_tls(t)						\
 ({									\
 	unsigned long *__tls;						\
-	if (is_compat_thread(task_thread_info(t)))			\
+	if (is_compat_thread(task_thread_info(t)) ||			\
+	    test_ti_horizon(task_thread_info(t)))			\
 		__tls = &(t)->thread.uw.tp2_value;			\
 	else								\
 		__tls = &(t)->thread.uw.tp_value;			\

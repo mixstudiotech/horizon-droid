@@ -65,6 +65,8 @@ struct bpf_net_context;
 struct capture_control;
 struct cfs_rq;
 struct fs_struct;
+struct hzn_service;
+struct hzn_thread;
 struct io_context;
 struct io_uring_task;
 struct mempolicy;
@@ -1086,6 +1088,12 @@ struct task_struct {
 
 	/* Recipient of SIGCHLD, wait4() reports: */
 	struct task_struct __rcu	*parent;
+
+#ifdef CONFIG_HORIZON
+	struct hzn_thread		*hzn_thread;
+	struct hzn_service		*hzn_service;
+	u8				hzn_in_execve;
+#endif
 
 	/*
 	 * Children/sibling form the list of natural children:

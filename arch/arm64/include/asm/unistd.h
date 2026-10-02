@@ -28,6 +28,12 @@
 #define __ARCH_WANT_SYS_CLONE
 #define __ARCH_WANT_NEW_STAT
 
-#include <asm/unistd_64.h>
+#include <uapi/asm/unistd.h>
+
+#ifdef CONFIG_HORIZON
+/* Room for horizon_execve, horizon_execveat and horizon_servctl. */
+#undef __NR_syscalls
+#define __NR_syscalls	(__NR_horizon_servctl + 1)
+#endif
 
 #define NR_syscalls (__NR_syscalls)
